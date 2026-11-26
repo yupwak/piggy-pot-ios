@@ -1,0 +1,76 @@
+name: build-ios
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Environment
+        run: |
+          sw_vers
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: |
+          set -e
+          if command -v xcodegen >/dev/null 2>&1; then
+            echo "XCODEGEN=xcodegen" >> "$GITHUB_ENV"; exit 0
+          fi
+          HOMEBREW_NO_AUTO_UPDATE=1 brew install xcodegen >/dev/null 2>&1 || true
+          if command -v xcodegen >/dev/null 2>&1; then
+            echo "XCODEGEN=xcodegen" >> "$GITHUB_ENV"; exit 0
+          fi
+          URL=$(curl -fsSL https://api.github.com/repos/yonaskolb/XcodeGen/releases/latest \
+            | jq -r '.assets[] | select(.name | test("xcodegen.*\\.zip")) | .browser_download_url' | head -1)
+          curl -fsSL -o /tmp/xcodegen.zip "$URL"
+          unzip -q -o /tmp/xcodegen.zip -d /tmp/xg
+          BIN=$(find /tmp/xg -type f -name xcodegen | head -1)
+          chmod +x "$BIN"
+          echo "XCODEGEN=$BIN" >> "$GITHUB_ENV"
+
+      - name: Generate Xcode project
+        run: $XCODEGEN generate --spec project.yml
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild -project PiggyPot.xcodeproj \
+            -scheme PiggyPot \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tee build.log
+
+      - name: Package unsigned IPA
+        if: success()
+        run: |
+          set -e
+          rm -rf Payload
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/PiggyPot.app Payload/
+          rm -f PiggyPot-unsigned.ipa
+          zip -qry PiggyPot-unsigned.ipa Payload
+          ls -lh PiggyPot-unsigned.ipa
+
+      - name: Publish release
+        if: always()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: build ${{ github.run_number }}
+          fail_on_unmatched_files: false
+          files: |
+            PiggyPot-unsigned.ipa
+            build.log
