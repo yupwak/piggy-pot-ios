@@ -21,12 +21,9 @@ jobs:
           xcodebuild -version
 
       - name: Install XcodeGen
+        timeout-minutes: 5
         run: |
           set -e
-          if command -v xcodegen >/dev/null 2>&1; then
-            echo "XCODEGEN=xcodegen" >> "$GITHUB_ENV"; exit 0
-          fi
-          HOMEBREW_NO_AUTO_UPDATE=1 brew install xcodegen >/dev/null 2>&1 || true
           if command -v xcodegen >/dev/null 2>&1; then
             echo "XCODEGEN=xcodegen" >> "$GITHUB_ENV"; exit 0
           fi
@@ -37,6 +34,10 @@ jobs:
           BIN=$(find /tmp/xg -type f -name xcodegen | head -1)
           chmod +x "$BIN"
           echo "XCODEGEN=$BIN" >> "$GITHUB_ENV"
+          "$BIN" --version
+
+      - name: Generate app icon
+        run: python3 tools/mkicon.py
 
       - name: Generate Xcode project
         run: $XCODEGEN generate --spec project.yml
