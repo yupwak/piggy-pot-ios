@@ -1,0 +1,14 @@
+name: probe
+on:
+  push:
+    paths: ['.probe/**']
+  workflow_dispatch:
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "linux ok $(date -u)"
+  mac:
+    runs-on: macos-26
+    steps:
+      - run: echo "mac ok $(date -u)"
