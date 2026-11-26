@@ -90,6 +90,9 @@ png += chunk(b"IHDR", struct.pack(">IIBBBBB", SIZE, SIZE, 8, 2, 0, 0, 0))
 png += chunk(b"IDAT", zlib.compress(raw, 9))
 png += chunk(b"IEND", b"")
 
-out = "/tmp/piggy/PiggyPot/Assets.xcassets/AppIcon.appiconset/icon1024.png"
+import os
+root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+out = os.path.join(root, "PiggyPot/Assets.xcassets/AppIcon.appiconset/icon1024.png")
+os.makedirs(os.path.dirname(out), exist_ok=True)
 open(out, "wb").write(png)
 print(out, len(png), "bytes")
